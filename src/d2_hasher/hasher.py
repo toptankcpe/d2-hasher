@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import List, Optional
+
+import pandas as pd
+from charset_normalizer import from_path
+
+from .core import multilayer_hash
+
+
+def _detect_encoding(file_path: str) -> str:
+    result = from_path(file_path).best()
+    if result is None:
+        return "utf-8"
+    return str(result.encoding)
+
+
+def _detect_delimiter(file_path: str, encoding: str) -> str:
+    """Sniff delimiter from the first line of the file."""
+    import csv
+
+    with open(file_path, "r", encoding=encoding, errors="replace") as f:
+        sample = f.readline()
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=",\t|;")
+        return dialect.delimiter
+    except csv.Error:
+        return ","
+
+
+def hash_columns(
+    columns: List[str],
+    secret_salts: List[str],
+    input_file: Optional[str] = None,
+    df: Optional[pd.DataFrame] = None,
+    output: Optional[str] = None,
+    chunksize: int = 10_000,
+    delimiter: Optional[str] = None,
+) -> Optional[pd.DataFrame]:
+    """
+    Hash specified columns of a CSV/TXT file or a DataFrame using
+    Multilayer SHA-512 hashing.
+
+    Args:
+        columns: Column names to hash.
+        secret_salts: Secret salts applied in order for each hash round.
+        input_file: Path to a delimiter-separated input file (CSV or TXT).
+        df: A pandas DataFrame to hash in-memory. Mutually exclusive approach
+            with input_file — if both are given, df takes precedence.
+        output: Output file path. Defaults to ``<input_stem>_hashed.csv``.
+            Ignored when df is supplied without input_file.
+        chunksize: Rows per chunk when reading large files. Default 10 000.
+        delimiter: Column delimiter for input_file. Auto-detected when None.
+
+    Returns:
+        When *df* is provided (and no input_file): returns the hashed
+        DataFrame (the original object is not mutated).
+        When input_file is provided: writes the output file and returns None.
+
+    Raises:
+        ValueError: If neither input_file nor df is provided, or if specified
+            columns are missing.
+    """
+    if len(secret_salts) != 3:
+        raise ValueError("secret_salts must contain exactly 3 elements.")
+
+    if input_file is None and df is None:
+        raise ValueError("Provide either 'input_file' or 'df'.")
+
+    # --- In-memory DataFrame path ---
+    if df is not None and input_file is None:
+        missing = [c for c in columns if c not in df.columns]
+        if missing:
+            raise ValueError(f"Columns not found in DataFrame: {missing}")
+        result = df.copy()
+        for col in columns:
+            result[col] = result[col].apply(
+                lambda v: multilayer_hash(v, secret_salts)
+            )
+        return result
+
+    # --- File path ---
+    input_file = str(input_file)
+    if not os.path.isfile(input_file):
+        raise FileNotFoundError(f"Input file not found: {input_file}")
+
+    encoding = _detect_encoding(input_file)
+    sep = delimiter if delimiter is not None else _detect_delimiter(input_file, encoding)
+
+    if output is None:
+        p = Path(input_file)
+        output = str(p.parent / f"{p.stem}_hashed.csv")
+
+    first_chunk = True
+    for chunk in pd.read_csv(
+        input_file,
+        sep=sep,
+        encoding=encoding,
+        chunksize=chunksize,
+        dtype=str,
+        keep_default_na=False,
+    ):
+        missing = [c for c in columns if c not in chunk.columns]
+        if missing:
+            raise ValueError(f"Columns not found in file: {missing}")
+
+        for col in columns:
+            # Replace empty strings / "nan" strings that came from dtype=str
+            chunk[col] = chunk[col].apply(
+                lambda v: multilayer_hash(
+                    None if v in ("", "nan", "NaN", "NULL", "null") else v,
+                    secret_salts,
+                )
+            )
+
+        chunk.to_csv(
+            output,
+            index=False,
+            mode="w" if first_chunk else "a",
+            header=first_chunk,
+        )
+        first_chunk = False
+
+    return None

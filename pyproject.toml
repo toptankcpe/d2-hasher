@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "d2-hasher"
+version = "1.0.2"
+description = "Multilayer SHA-512 hashing utility for PII columns in CSV/TXT files"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+dependencies = [
+    "pandas>=1.5",
+    "charset-normalizer>=3.0",
+]
+
+[project.scripts]
+d2-hasher = "d2_hasher.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
