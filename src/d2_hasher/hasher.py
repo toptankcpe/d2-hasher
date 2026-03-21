@@ -38,6 +38,7 @@ def hash_columns(
     output: Optional[str] = None,
     chunksize: int = 10_000,
     delimiter: Optional[str] = None,
+    output_sep: Optional[str] = None,
 ) -> Optional[pd.DataFrame]:
     """
     Hash specified columns of a CSV/TXT file or a DataFrame using
@@ -118,6 +119,7 @@ def hash_columns(
         chunk.to_csv(
             output,
             index=False,
+            sep=output_sep if output_sep is not None else sep,
             mode="w" if first_chunk else "a",
             header=first_chunk,
         )
