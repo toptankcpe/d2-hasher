@@ -39,6 +39,7 @@ def hash_columns(
     chunksize: int = 10_000,
     delimiter: Optional[str] = None,
     output_sep: Optional[str] = None,
+    on_chunk=None,
 ) -> Optional[pd.DataFrame]:
     """
     Hash specified columns of a CSV/TXT file or a DataFrame using
@@ -90,11 +91,19 @@ def hash_columns(
     encoding = _detect_encoding(input_file)
     sep = delimiter if delimiter is not None else _detect_delimiter(input_file, encoding)
 
+    # Count total rows for progress reporting (only if callback given)
+    total_rows = None
+    if on_chunk is not None:
+        with open(input_file, "r", encoding=encoding, errors="replace") as _f:
+            total_rows = sum(1 for _ in _f) - 1  # subtract header
+        total_rows = max(total_rows, 1)
+
     if output is None:
         p = Path(input_file)
         output = str(p.parent / f"{p.stem}_hashed.csv")
 
     first_chunk = True
+    rows_done = 0
     for chunk in pd.read_csv(
         input_file,
         sep=sep,
@@ -124,5 +133,9 @@ def hash_columns(
             header=first_chunk,
         )
         first_chunk = False
+
+        if on_chunk is not None and total_rows is not None:
+            rows_done = min(rows_done + len(chunk), total_rows)
+            on_chunk(rows_done, total_rows)
 
     return None
