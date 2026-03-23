@@ -5,13 +5,15 @@ from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
-from charset_normalizer import from_path
+from charset_normalizer import from_bytes
 
 from .core import multilayer_hash
 
 
 def _detect_encoding(file_path: str) -> str:
-    result = from_path(file_path).best()
+    with open(file_path, "rb") as f:
+        raw = f.read(65536)
+    result = from_bytes(raw).best()
     if result is None:
         return "utf-8"
     return str(result.encoding)
