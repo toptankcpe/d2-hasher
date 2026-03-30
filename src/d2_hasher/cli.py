@@ -19,17 +19,19 @@ def main() -> None:
     )
     parser.add_argument(
         "--columns",
-        required=True,
+        required=False,
+        default=None,
         nargs="+",
         metavar="COL",
-        help="One or more column names to hash.",
+        help="One or more column names to hash. Required if --mask-columns not provided.",
     )
     parser.add_argument(
         "--secret-salts",
-        required=True,
+        required=False,
+        default=None,
         nargs="+",
         metavar="SALT",
-        help="One or more secret salts applied in order.",
+        help="Secret salts for hashing (required when --columns is used).",
     )
     parser.add_argument(
         "--output",
@@ -79,10 +81,25 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    # Validate arguments
+    if not args.columns and not args.mask_columns:
+        print(
+            "Error: Provide at least one of --columns or --mask-columns.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if args.columns and not args.secret_salts:
+        print(
+            "Error: --secret-salts is required when using --columns.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     try:
         hash_columns(
-            columns=args.columns,
-            secret_salts=args.secret_salts,
+            columns=args.columns if args.columns else [],
+            secret_salts=args.secret_salts if args.secret_salts else [],
             input_file=args.input_file,
             output=args.output,
             chunksize=args.chunksize,

@@ -53,6 +53,7 @@ def hash_columns(
     Args:
         columns: Column names to hash.
         secret_salts: Secret salts applied in order for each hash round.
+            Required (3 elements) only when columns is not empty.
         input_file: Path to a delimiter-separated input file (CSV or TXT).
         df: A pandas DataFrame to hash in-memory. Mutually exclusive approach
             with input_file — if both are given, df takes precedence.
@@ -61,6 +62,7 @@ def hash_columns(
         chunksize: Rows per chunk when reading large files. Default 10 000.
         delimiter: Column delimiter for input_file. Auto-detected when None.
         mask_columns: Column names to mask with fixed characters instead of hashing.
+            At least one of 'columns' or 'mask_columns' must be provided.
         mask_char: Character to use for masking (default: "*").
         mask_length: Number of masking characters (default: 4).
 
@@ -73,14 +75,19 @@ def hash_columns(
         ValueError: If neither input_file nor df is provided, or if specified
             columns are missing.
     """
-    if len(secret_salts) != 3:
-        raise ValueError("secret_salts must contain exactly 3 elements.")
-
     if input_file is None and df is None:
         raise ValueError("Provide either 'input_file' or 'df'.")
 
     if mask_columns is None:
         mask_columns = []
+
+    # At least one of columns or mask_columns must be provided
+    if not columns and not mask_columns:
+        raise ValueError("Provide at least one column in 'columns' or 'mask_columns'.")
+
+    # Verify secret_salts only when hashing columns
+    if columns and len(secret_salts) != 3:
+        raise ValueError("secret_salts must contain exactly 3 elements when hashing columns.")
 
     # --- In-memory DataFrame path ---
     if df is not None and input_file is None:

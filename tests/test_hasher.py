@@ -170,3 +170,81 @@ class TestHashColumnsFile:
         )
         result = pd.read_csv(out)
         assert len(result) == 50
+
+
+# ---------------------------------------------------------------------------
+# Mask columns and validation
+# ---------------------------------------------------------------------------
+
+class TestMaskColumnsAndValidation:
+    def _sample_df(self):
+        return pd.DataFrame(
+            {
+                "name": ["Alice", "Bob"],
+                "phone": ["0812345678", "0898765432"],
+                "email": ["alice@test.com", "bob@test.com"],
+            }
+        )
+
+    def test_requires_columns_or_mask_columns(self):
+        """Test that at least one of columns or mask_columns must be provided"""
+        df = self._sample_df()
+        with pytest.raises(ValueError, match="at least one column"):
+            hash_columns(columns=[], secret_salts=SALTS, df=df, mask_columns=[])
+
+    def test_mask_only_without_secret_salts(self):
+        """Test using mask_columns alone without hashing"""
+        df = self._sample_df()
+        result = hash_columns(
+            columns=[],
+            secret_salts=[],  # Empty is OK when no hashing
+            df=df,
+            mask_columns=["phone", "email"],
+            mask_char="*",
+            mask_length=4,
+        )
+        assert result["phone"].iloc[0] == "****"
+        assert result["email"].iloc[0] == "****"
+        assert result["name"].iloc[0] == "Alice"  # unchanged
+
+    def test_hash_and_mask_combined(self):
+        """Test using both hash and mask together"""
+        df = self._sample_df()
+        result = hash_columns(
+            columns=["name"],
+            secret_salts=SALTS,
+            df=df,
+            mask_columns=["phone", "email"],
+            mask_char="*",
+            mask_length=4,
+        )
+        # Name should be hashed
+        from d2_hasher.core import multilayer_hash
+        assert result["name"].iloc[0] == multilayer_hash("Alice", SALTS)
+        # Phone and email should be masked
+        assert result["phone"].iloc[0] == "****"
+        assert result["email"].iloc[0] == "****"
+
+    def test_secret_salts_required_when_hashing(self):
+        """Test that secret_salts with 3 elements is required when columns is not empty"""
+        df = self._sample_df()
+        with pytest.raises(ValueError, match="secret_salts must contain exactly 3"):
+            hash_columns(
+                columns=["name"],
+                secret_salts=["only_one"],  # Not 3 elements
+                df=df,
+            )
+
+    def test_custom_mask_char_and_length(self):
+        """Test custom mask character and length"""
+        df = self._sample_df()
+        result = hash_columns(
+            columns=[],
+            secret_salts=[],
+            df=df,
+            mask_columns=["phone"],
+            mask_char="X",
+            mask_length=8,
+        )
+        assert result["phone"].iloc[0] == "XXXXXXXX"
+        assert result["phone"].iloc[1] == "XXXXXXXX"

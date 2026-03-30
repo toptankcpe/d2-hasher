@@ -1,5 +1,5 @@
 from .hasher import hash_columns
-from .core import multilayer_hash, normalize_cid
+from .core import multilayer_hash, normalize_cid, mask_value
 
-__all__ = ["hash_columns", "multilayer_hash", "normalize_cid"]
-__version__ = "1.0.6"
+__all__ = ["hash_columns", "multilayer_hash", "normalize_cid", "mask_value"]
+__version__ = "1.1.1"
