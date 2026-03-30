@@ -56,6 +56,26 @@ def main() -> None:
             "Auto-detected from the file when not specified."
         ),
     )
+    parser.add_argument(
+        "--mask-columns",
+        default=None,
+        nargs="+",
+        metavar="COL",
+        help="One or more column names to mask with **** instead of hashing.",
+    )
+    parser.add_argument(
+        "--mask-char",
+        default="*",
+        metavar="CHAR",
+        help="Character to use for masking (default: *).",
+    )
+    parser.add_argument(
+        "--mask-length",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Number of masking characters (default: 4).",
+    )
 
     args = parser.parse_args()
 
@@ -67,6 +87,9 @@ def main() -> None:
             output=args.output,
             chunksize=args.chunksize,
             delimiter=args.delimiter,
+            mask_columns=args.mask_columns,
+            mask_char=args.mask_char,
+            mask_length=args.mask_length,
         )
     except (ValueError, FileNotFoundError) as exc:
         print(f"Error: {exc}", file=sys.stderr)

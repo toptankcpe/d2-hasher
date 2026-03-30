@@ -4,6 +4,37 @@ from typing import Any, List, Optional
 _THAI_DIGIT_TABLE = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")
 
 
+def mask_value(value: Any, mask_char: str = "*", mask_length: int = 4) -> Optional[str]:
+    """
+    Mask a value by replacing it with a fixed-length masking character.
+
+    Args:
+        value: Input value. Returns None if null/NaN.
+        mask_char: Character to use for masking (default: "*").
+        mask_length: Number of masking characters (default: 4).
+
+    Returns:
+        Masked string (e.g., "****"), or None if value is null/NaN.
+    """
+    if value is None:
+        return None
+
+    # Handle NaN (float('nan') or pandas NA)
+    try:
+        import math
+        if isinstance(value, float) and math.isnan(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+
+    # Return masked string only if value is not empty
+    v = str(value).strip()
+    if v in ("", "nan", "NaN", "NULL", "null"):
+        return None
+
+    return mask_char * mask_length
+
+
 def normalize_cid(value: str) -> Optional[str]:
     """
     Normalize a Thai national ID (CID) string.
